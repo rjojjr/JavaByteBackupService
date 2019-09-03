@@ -28,7 +28,7 @@ class IndependentClientHandler implements Runnable {
     private boolean stop;
 
     public IndependentClientHandler(Socket socket) {
-        inputParser = new InputParser(MultiClientServer.threadpool);
+        inputParser = new InputParser();
         this.clientSocket = socket;
         //System.out.println("here");
         stop = false;

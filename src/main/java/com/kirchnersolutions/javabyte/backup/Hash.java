@@ -10,9 +10,9 @@ class Hash implements Runnable {
     private String tableName = "";
     private ThreadPoolExecutor threadPoolExecutor;
 
-    Hash(String tableName, ThreadPoolExecutor threadPoolExecutor) {
+    Hash(String tableName) {
         this.tableName = tableName;
-        this.threadPoolExecutor = threadPoolExecutor;
+        this.threadPoolExecutor = MultiClientServer.threadpool;
     }
 
     public void run() {
