@@ -23,7 +23,6 @@ class IndependentClientHandler implements Runnable {
 
     private volatile boolean loggedOn = false;
     private InputParser inputParser;
-    private String userName = "";
 
     private boolean stop;
 
@@ -32,12 +31,6 @@ class IndependentClientHandler implements Runnable {
         this.clientSocket = socket;
         //System.out.println("here");
         stop = false;
-    }
-
-    public String getUserName() {
-        synchronized (this) {
-            return new String(userName);
-        }
     }
 
     public void stopThread() {

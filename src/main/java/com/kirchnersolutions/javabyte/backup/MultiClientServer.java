@@ -35,8 +35,8 @@ class MultiClientServer {
     private ServerSocket serverSocket;
     static ThreadPoolExecutor threadpool;
     
-    public MultiClientServer(ThreadPoolExecutor threadPoolExecutor){
-        threadpool = threadPoolExecutor;
+    public MultiClientServer(){
+        threadpool = ServerThread.threadPoolExecutor;
     }
 
     public void start(int port) {
