@@ -1,9 +1,9 @@
 package com.kirchnersolutions.javabyte.backup;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -30,16 +30,10 @@ public class Backup implements Callable<String> {
     public String call() throws Exception {
         File pages = new File("Database/Tables/" + tableName + "/TablePages");
         File table = new File("Database/Tables/" + tableName);
-        FileOutputStream[] fosa = new FileOutputStream[pages.listFiles().length];
-        ZipOutputStream[] zipOuta = new ZipOutputStream[pages.listFiles().length];
         Future<String>[] futures = new Future[pages.listFiles().length];
-        FileOutputStream fos = new FileOutputStream("Database/Backup/" + tableName + "/" + tableName + "-" + CalenderConverter.getMonthDayYearHourMinuteSecond(time, "-", "-") + ".jbb");
-        ZipOutputStream zipOut = new ZipOutputStream(fos);
         int count = 0;
         for (File page : pages.listFiles()) {
-            fosa[count] = new FileOutputStream(new File(bkDir, "/TablePages/" + page.getName()));
-            zipOuta[count] = new ZipOutputStream(fosa[count]);
-            futures[count] = threadPoolExecutor.submit(new ZipPage(page, zipOuta[count]));
+            futures[count] = threadPoolExecutor.submit(new ZipPage(page, "Database/Backup/" + tableName + "/" + tableName + "-" + CalenderConverter.getMonthDayYearHourMinuteSecond(time, "-", "-") + "/" + page.getName() + ".jbb"));
             count++;
         }
         count = 0;
@@ -47,23 +41,18 @@ public class Backup implements Callable<String> {
         for (Future future : futures) {
             try {
                 if (future.get().equals("t")) {
-                    zipOuta[count].close();
-                    fosa[count].close();
                 } else {
                     failed = true;
-                    zipOuta[count].close();
-                    fosa[count].close();
                 }
             } catch (Exception e) {
+                e.printStackTrace();
                 failed = true;
             } finally {
-                zipOuta[count].close();
-                fosa[count].close();
             }
             count++;
         }
         if(failed){
-            return "failed";
+            return "false";
         }
         for(File def : table.listFiles()){
             if(def.isFile()){
@@ -74,70 +63,118 @@ public class Backup implements Callable<String> {
                     }
                     ByteTools.writeBytesToFile(newDef, ByteTools.readBytesFromFile(def));
                 } catch (Exception e) {
-                    return "failed";
+                    e.printStackTrace();
+                    return "false";
                 } finally {
                 }
             }
         }
-        if(zipFileDir(bkDir, bkDir.getName(), zipOut)){
-            zipOut.close();
-            fos.close();
-            return "true";
+        zip(new ArrayList<>(Arrays.asList(bkDir.listFiles())), "Database/Backup/" + tableName + "/" + tableName + "-" + CalenderConverter.getMonthDayYearHourMinuteSecond(time, "-", "-") + ".jbb");
+        for(File file : bkDir.listFiles()){
+            file.delete();
         }
-        zipOut.close();
-        fos.close();
-        return "failed";
+        bkDir.delete();
+        return "true";
     }
 
     private class ZipPage implements Callable<String>{
 
         private File rowDir;
-        private ZipOutputStream zipOutputStream;
+        private String zipOutputStream;
 
-        ZipPage(File rowDir, ZipOutputStream zipOutputStream){
+        ZipPage(File rowDir, String zipOutputStream){
             this.rowDir = rowDir;
             this.zipOutputStream = zipOutputStream;
         }
 
         public String call(){
             try{
-                zipFileDir(rowDir, rowDir.getName(), zipOutputStream);
+                zip(new ArrayList<>(Arrays.asList(rowDir.listFiles())), zipOutputStream);
                 return "t";
             }catch (Exception e){
+                e.printStackTrace();
                 return "f";
             }
         }
 
     }
 
-    private static boolean zipFileDir(File fileToZip, String fileName, ZipOutputStream zipOut) throws IOException {
-        if (fileToZip.isHidden()) {
-
-        }
-        if (fileToZip.isDirectory()) {
-            if (fileName.endsWith("/")) {
-                zipOut.putNextEntry(new ZipEntry(fileName));
-                zipOut.closeEntry();
+    public boolean zip(List<File> listFiles, String destZipFile) throws FileNotFoundException,
+            IOException {
+        ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(new File(destZipFile)));
+        for (File file : listFiles) {
+            if (file.isDirectory()) {
+                zipDirectory(file, file.getName(), zos);
             } else {
-                zipOut.putNextEntry(new ZipEntry(fileName + "/"));
-                zipOut.closeEntry();
+                zipFile(file, zos);
             }
-            File[] children = fileToZip.listFiles();
-            for (File childFile : children) {
-                zipFileDir(childFile, fileName + "/" + childFile.getName(), zipOut);
-            }
-
         }
-        FileInputStream fis = new FileInputStream(fileToZip);
-        ZipEntry zipEntry = new ZipEntry(fileName);
-        zipOut.putNextEntry(zipEntry);
-        byte[] bytes = new byte[1024];
-        int length;
-        while ((length = fis.read(bytes)) >= 0) {
-            zipOut.write(bytes, 0, length);
-        }
-        fis.close();
+        zos.flush();
+        zos.close();
         return true;
+    }
+    /**
+     * Compresses files represented in an array of paths
+     * @param files a String array containing file paths
+     * @param destZipFile The path of the destination zip file
+     * @throws FileNotFoundException
+     * @throws IOException
+     */
+    public void zip(String[] files, String destZipFile) throws FileNotFoundException, IOException {
+        List<File> listFiles = new ArrayList<File>();
+        for (int i = 0; i < files.length; i++) {
+            listFiles.add(new File(files[i]));
+        }
+        zip(listFiles, destZipFile);
+    }
+    /**
+     * Adds a directory to the current zip output stream
+     * @param folder the directory to be  added
+     * @param parentFolder the path of parent directory
+     * @param zos the current zip output stream
+     * @throws FileNotFoundException
+     * @throws IOException
+     */
+    private void zipDirectory(File folder, String parentFolder,
+                              ZipOutputStream zos) throws FileNotFoundException, IOException {
+        for (File file : folder.listFiles()) {
+            if (file.isDirectory()) {
+                zipDirectory(file, parentFolder + "/" + file.getName(), zos);
+                continue;
+            }
+            zos.putNextEntry(new ZipEntry(parentFolder + "/" + file.getName()));
+            BufferedInputStream bis = new BufferedInputStream(
+                    new FileInputStream(file));
+            long bytesRead = 0;
+            byte[] bytesIn = new byte[1024];
+            int read = 0;
+            while ((read = bis.read(bytesIn)) != -1) {
+                zos.write(bytesIn, 0, read);
+                bytesRead += read;
+            }
+            zos.closeEntry();
+        }
+    }
+    /**
+     * Adds a file to the current zip output stream
+     * @param file the file to be added
+     * @param zos the current zip output stream
+     * @throws FileNotFoundException
+     * @throws IOException
+     */
+    private void zipFile(File file, ZipOutputStream zos)
+            throws FileNotFoundException, IOException {
+        zos.putNextEntry(new ZipEntry(file.getName()));
+        BufferedInputStream bis = new BufferedInputStream(new FileInputStream(
+                file));
+        long bytesRead = 0;
+        byte[] bytesIn = new byte[1024];
+        int read = 0;
+        while ((read = bis.read(bytesIn)) != -1) {
+            zos.write(bytesIn, 0, read);
+            bytesRead += read;
+        }
+        zos.closeEntry();
     }
 
 }

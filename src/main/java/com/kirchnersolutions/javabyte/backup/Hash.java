@@ -5,7 +5,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
 
-class Hash implements Runnable {
+class Hash implements Callable<String> {
 
     private String tableName = "";
     private ThreadPoolExecutor threadPoolExecutor;
@@ -15,12 +15,18 @@ class Hash implements Runnable {
         this.threadPoolExecutor = MultiClientServer.threadpool;
     }
 
-    public void run() {
+    public String call() {
         File dir = new File("Database/Tables/" + tableName);
+        System.out.println("Hashing table " + tableName);
         if (dir.exists()) {
-            File bkDir = new File("Database/Backup/" + tableName);
+            File bkDir = new File("Database/Backup/");
             if (!bkDir.exists()) {
                 bkDir.mkdirs();
+            }
+            File tbkDir = new File(bkDir, "/" + tableName );
+            if (!tbkDir.exists()) {
+                tbkDir.mkdirs();
+
             }
             Future<byte[]>[] futures = new Future[new File(dir, "/TablePages").listFiles().length];
             int count = 0;
@@ -40,18 +46,24 @@ class Hash implements Runnable {
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
+                    System.out.println("Failed");
+                    return "false";
                 }
             }
             try {
-                File hashFile = new File(bkDir, "/" + tableName + CalenderConverter.getMonthDayYearHourMinuteSecond(System.currentTimeMillis(), "-", "-") + ".hash");
+                File hashFile = new File(tbkDir, "/" + tableName + CalenderConverter.getMonthDayYearHourMinuteSecond(System.currentTimeMillis(), "-", "-") + ".hash");
                 if(!hashFile.exists()){
                     hashFile.createNewFile();
                 }
                 ByteTools.writeBytesToFile(hashFile, hash);
             } catch (Exception e) {
                 e.printStackTrace();
+                System.out.println("Failed");
+                return "false";
             }
         }
+        System.out.println("Done");
+        return "true";
     }
 
     byte[] getHash(String string) {

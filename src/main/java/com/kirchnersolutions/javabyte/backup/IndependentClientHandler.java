@@ -35,6 +35,7 @@ class IndependentClientHandler implements Runnable {
 
     public void stopThread() {
         synchronized (this) {
+
             this.stop = true;
         }
     }
@@ -61,9 +62,13 @@ class IndependentClientHandler implements Runnable {
         String inputLine;
         try {
             while ((inputLine = in.readLine()) != null && !stop) {
-                out.write(inputParser.parse(inputLine));
+                String rt = inputParser.parse(inputLine);
+                out.write(rt + "\n");
+
                 out.flush();
+                //System.out.println(rt);
             }
+
             in.close();
             out.close();
         } catch (IOException ex) {
